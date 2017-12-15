@@ -50,4 +50,11 @@ export default class {
             return a.temps_arivee > b.temps_arivee
         })
     }
+
+
+    sort1() {
+        this.data.sort((a, b) => {
+            return a.temps_restant > b.temps_restant
+        })
+    }
 }
