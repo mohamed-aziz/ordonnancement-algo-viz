@@ -44,6 +44,8 @@
                     <th>Duree</th>
                     <th>Prioritee</th>
                     <th>temps arivee</th>
+                    <th>temps d'attente</th>
+                    <th>temps de traitement</th>
                     <th></th>
                 </tr>
             </thead>
@@ -53,11 +55,39 @@
 	        	<td>{{ row.duree }}</td>
 	        	<td>{{ row.prioritee }}</td>
 	        	<td>{{ row.temps_arivee }}</td>
-
+                <td>{{ row.temps_attente }}</td>
+                <td> {{row.temps_traitement}}</td>
 		        <td><a @click="removeRow(row, index)">Remove</a></td>
 	        </tr>
             </tbody>
     </table>
+
+    <br>
+
+    <div>
+        Temps d'arivee moyen: <b>{{ arr_moy }}</b>
+        <br>
+        Temps d'attente moyen: <b>{{ att_moy }} </b>
+    </div>
+    <h2>Algorithme</h2>
+    
+    <input type="radio" id="one" value="fifo" v-model="algo">
+    <label for="one">FIFO</label>
+    <br>
+    <input type="radio" id="two" value="sjf" v-model="algo">
+    <label for="two">SJF</label>
+    <br>
+    <input type="radio" id="three" value="srt" v-model="algo">
+    <label for="three">SRT</label>
+    <br>
+    <input type="radio" id="four" value="rr" v-model="algo">
+    <label for="four">Round Robin</label>
+    <br>
+    <div id="in">
+        <label for="">Quantum</label>
+        <input v-model.number="quantum" min="0" type="number">
+    </div>
+
 </div>
 </template>
 
@@ -68,11 +98,14 @@ import Proc from "@/algorithms/data"
 import FIFO from "@/algorithms/fifo"
 import SJF from "@/algorithms/sjf"
 import RR from "@/algorithms/rr"
+import SRT from "@/algorithms/srt"
 
 export default {
     name: 'Viz',
     data () {
         return {
+            att_moy: 0,
+            arr_moy: 0,
             procs: [],
             calc: {},
             last: 5,
@@ -83,14 +116,26 @@ export default {
                 temps_arivee: 0
             },
             curr: {},
-            algo: FIFO
+            algo: "sjf",
+            quantum: 1
         }
     },
 
     watch: {
         'procs': function (val) {
-            // this.curr = this.algo(this.procs)
-            this.curr = RR(this.procs, 2)
+            this.chooseAlgo()
+            this.calcTemps()
+            // this.curr = SRT(this.procs)
+            this.doStuff()
+        },
+        'algo': function (val) {
+            this.chooseAlgo()
+            this.calcTemps()
+            this.doStuff()
+        },
+        'quantum': function (val) {
+            this.chooseAlgo()
+            this.calcTemps()
             this.doStuff()
         }
     },
@@ -106,14 +151,67 @@ export default {
             new Proc('P7', 0, 14, 1),
             ]
 
-        // RR(this.procs, 3)
-        // this.curr = RR(this.procs, 3)
         this.doStuff()
         this.show()
     },
 
 
     methods: {
+        calcTemps() {
+            let m = new Map()
+            for (let proc of this.curr)  {
+              if (!m.get(proc.nom)) {
+                m.set(proc.nom, [proc])
+              } else {
+                 let a = m.get(proc.nom)
+                 a.push(proc)
+                 m.set(proc.nom, a)
+              }
+            }
+            let m1 = 0
+            let m2 = 0
+            for (let i=0; i < this.procs.length; i++) {
+              let proc = this.procs[i]
+              let te = proc.temps_arivee 
+              let ts = Math.max(...m.get(proc.nom).map(p => p.temps_arivee))
+              let tf = m.get(proc.nom).find(proc => proc.temps_arivee === ts).duree + ts
+              if (m.get(proc.nom).length > 1) {
+                proc.temps_attente = ts - te - proc.duree
+                proc.temps_traitement = tf - te - proc.duree
+              } else {
+                proc.temps_attente = ts - te
+                proc.temps_traitement = tf - te
+              }
+              m1 += proc.temps_attente
+              m2 += proc.temps_arivee
+            }
+
+            this.att_moy = m1 / this.procs.length
+            this.arr_moy = m2 / this.procs.length
+        },
+        chooseAlgo() {
+            if (this.algo === "fifo") {
+                this.fifo()
+            } else if (this.algo === "srt") {
+                this.srt()
+            } else if (this.algo === "rr") {
+                this.rr()
+            } else if (this.algo === "sjf") {
+                this.sjf()
+            }
+        },
+        rr() {
+            this.curr = RR(this.procs, this.quantum)
+        },
+        sjf() {
+            this.curr = SJF(this.procs)
+        },
+        srt() {
+            this.curr = SRT(this.procs)
+        },
+        fifo() {
+            this.curr = FIFO(this.procs)
+        },
         show () {
             this.$modal.show('hello-world');
         },
